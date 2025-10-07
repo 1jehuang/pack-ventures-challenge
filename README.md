@@ -45,8 +45,16 @@ This tool takes a list of companies (with their URLs) and returns a structured J
 
 ### Running the Tool
 
+**Important:** Activate the virtual environment first!
+
 ```bash
+source venv/bin/activate
 python founder_finder.py
+```
+
+Or to save logs to a file:
+```bash
+source venv/bin/activate && python founder_finder.py 2>&1 | tee founder_finder.log
 ```
 
 The tool will:
@@ -54,11 +62,40 @@ The tool will:
 2. **Process all companies in parallel** (all agents run concurrently)
 3. Show real-time logs with search queries, tool results, and progress
 4. Generate `founders.json` with the results
+5. Create conversation logs in `logs/` directory for each company
 
-**To save logs to a file:**
-```bash
-python founder_finder.py 2>&1 | tee founder_finder.log
+**Expected Output:**
+
 ```
+Found 10 companies to process
+Running in parallel mode - all companies processed concurrently
+
+Starting parallel execution...
+
+[1/10] Starting search for Approval AI...
+[2/10] Starting search for Meteor...
+[3/10] Starting search for Read AI...
+...
+    🔍 Searching: "Meteor browse.dev founders"
+    ✓ Tool results received
+    ✅ Final answer: 2 founder(s)
+[2/10] ✓ Meteor: Found 2 founders
+...
+============================================================
+✓ Results saved to founders.json
+
+Summary:
+  Total companies: 10
+  Companies with founders: 10
+  Companies without founders: 0
+============================================================
+```
+
+**Common Error (if venv not activated):**
+```
+ModuleNotFoundError: No module named 'claude_agent_sdk'
+```
+→ Solution: Run `source venv/bin/activate` first
 
 ### Verifying Results
 
