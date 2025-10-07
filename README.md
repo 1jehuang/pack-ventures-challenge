@@ -120,49 +120,18 @@ The tool uses **parallel processing** with independent agents for maximum effici
 
 ## Future Improvements
 
-Given more time, here are enhancements I would add:
+### 1. **Codex SDK Support**
+- Add Codex SDK support for OpenAI model optionality alongside Claude
 
-### 1. **Caching and Rate Limiting**
-- Implement Redis/file-based caching to avoid re-querying the same companies
-- Add intelligent rate limiting to manage API costs
-- Store intermediate results to enable resume-on-failure
+### 2. **CLI Subscription Support**
+- Add Claude Code CLI and Codex CLI support for subscription-based usage instead of API keys
+- Would require a different implementation approach than the current SDK
 
-### 2. **Data Validation and Confidence Scoring**
-- Cross-reference multiple sources (Crunchbase API, LinkedIn, PitchBook)
-- Assign confidence scores based on source reliability
-- Flag founders with conflicting information for manual review
-- Validate founder names against common patterns (avoid AI hallucinations)
-
-### 3. **Enhanced Output Formats**
-- Include additional metadata (founding year, roles like CEO/CTO, LinkedIn profiles)
-- Support multiple output formats (CSV, Excel, Database export)
-- Generate summary statistics and visualizations
-- Add LinkedIn/Twitter handles for each founder
-
-### 4. **Monitoring and Observability**
-- Save detailed conversation logs to files (currently only stdout)
-- Track API usage and costs per query
-- Add Sentry/Datadog integration for error tracking
-- Create dashboard showing success rates, average query time, etc.
-
-### 5. **Specialized Handling**
-- Detect acquired companies and handle founder transitions
-- Handle international companies with non-Latin characters
-- Support stealth mode companies with limited public info
-- Add fallback to Crunchbase/LinkedIn APIs when web search fails
-
-### 6. **User Experience Improvements**
-- Add CLI interface with `click` or `typer` for better UX
-- Support reading from CSV/Excel, not just text files
-- Interactive mode to confirm uncertain results
-- Web UI for non-technical users
-- Add progress bar for parallel execution
-
-### 7. **Quality Assurance**
-- Implement human-in-the-loop review for low-confidence results
-- Add integration tests with real company data
-- Create benchmark dataset for accuracy measurement
-- A/B test different system prompts for better extraction
+### 3. **Pre-Web Scrape with Faster Models**
+- First scrape the entire website domain
+- Process with a smaller/faster LLM to check for founder information
+- Only fall back to full agent search if founders not found
+- Significantly reduce cost and latency for companies with clear "About" pages
 
 ## Project Structure
 
