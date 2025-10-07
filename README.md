@@ -209,15 +209,14 @@ The Claude Agent SDK provides the best balance of:
 
 ### Cost Considerations
 
-Each founder query uses approximately:
-- 1-3 web searches (most companies need only 1)
-- 0-1 web fetches (when agent needs to verify from company website)
-- ~1,000-3,000 tokens per company
-
 **Actual run results (10 companies in parallel):**
-- Total cost: ~$0.08 USD
+- Total cost: ~$1.00 USD
 - Processing time: ~5 minutes (all companies processed concurrently)
-- Cache hits improve cost on subsequent runs
+
+**Cost optimization:**
+- Current system prompt allows for verbosity to maximize accuracy and performance
+- Cost can be reduced significantly by making the agent less verbose in the system prompt
+- Trade-off: Lower cost vs. potentially reduced accuracy/completeness
 
 **Performance characteristics:**
 - Runtime is ~5 minutes regardless of input size n (due to full parallelization)
