@@ -191,32 +191,13 @@ The tool successfully found founders for **all 10 companies** in the input file:
 - **0/10** companies with missing data
 
 See `founders.json` for the complete results.
-
-## Technical Notes
-
-### Why Claude Agent SDK?
-
-While I could have used:
-- **Web scraping (BeautifulSoup):** Fragile, requires per-site parsers
-- **API services (Crunchbase, Clearbit):** Cost money, rate-limited, incomplete data
-- **GPT-4 with function calling:** More setup, less integrated tooling
-
-The Claude Agent SDK provides the best balance of:
-- ✅ Accuracy (AI understands context)
-- ✅ Reliability (handles different website structures)
-- ✅ Ease of use (built-in web search and tool orchestration)
-- ✅ Cost-effectiveness (pay only for what you use)
+You may delete or empty the file first to see the result fill in after the agent completes. 
 
 ### Cost Considerations
 
 **Actual run results (10 companies in parallel):**
-- Total cost: ~$1.00 USD
+- Total cost: ~$1.00 USD (Note that modifying system prompt to force lower verbosity will sigifigantly reduce cost. In my prompt I allow verbosity for maximum performance, though perfomance boost is minimal.)
 - Processing time: ~5 minutes (all companies processed concurrently)
-
-**Cost optimization:**
-- Current system prompt allows for verbosity to maximize accuracy and performance
-- Cost can be reduced significantly by making the agent less verbose in the system prompt
-- Trade-off: Lower cost vs. potentially reduced accuracy/completeness
 
 **Performance characteristics:**
 - Runtime is ~5 minutes regardless of input size n (due to full parallelization)
