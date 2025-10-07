@@ -8,6 +8,7 @@ import pytest
 import tempfile
 from unittest.mock import patch, AsyncMock
 from founder_finder import parse_companies_file, find_founders
+from claude_agent_sdk import AssistantMessage, TextBlock
 
 
 class TestParseCompaniesFile:
@@ -77,35 +78,36 @@ class TestFindFounders:
     @pytest.mark.asyncio
     async def test_find_founders_valid_response(self):
         """Test finding founders with valid JSON response"""
-        # Mock the message object returned by query()
-        class MockMessage:
-            def __init__(self, text):
-                self.role = 'assistant'
-                self.content = [type('obj', (object,), {
-                    'type': 'text',
-                    'text': text
-                })]
-
         async def mock_query(*args, **kwargs):
-            yield MockMessage('["Brian Chesky", "Joe Gebbia", "Nathan Blecharczyk"]')
+            # Create mock objects that match the real SDK structure
+            text_block = type('TextBlock', (), {'text': '["Brian Chesky", "Joe Gebbia", "Nathan Blecharczyk"]'})()
+            message = type('AssistantMessage', (), {'content': [text_block]})()
+            yield message
 
         with patch('founder_finder.query', side_effect=mock_query):
-            founders = await find_founders("Airbnb", "https://www.airbnb.com")
-            assert founders == ["Brian Chesky", "Joe Gebbia", "Nathan Blecharczyk"]
+            with patch('founder_finder.AssistantMessage', return_value=type('AssistantMessage', (), {})):
+                with patch('founder_finder.TextBlock', return_value=type('TextBlock', (), {})):
+                    # Patch isinstance to work with our mocks
+                    original_isinstance = __builtins__.isinstance
+                    def mock_isinstance(obj, classinfo):
+                        if classinfo.__name__ == 'AssistantMessage' and hasattr(obj, 'content'):
+                            return True
+                        if classinfo.__name__ == 'TextBlock' and hasattr(obj, 'text'):
+                            return True
+                        return original_isinstance(obj, classinfo)
+
+                    with patch('builtins.isinstance', side_effect=mock_isinstance):
+                        founders = await find_founders("Airbnb", "https://www.airbnb.com")
+                        assert founders == ["Brian Chesky", "Joe Gebbia", "Nathan Blecharczyk"]
 
     @pytest.mark.asyncio
     async def test_find_founders_empty_result(self):
         """Test when no founders are found"""
-        class MockMessage:
-            def __init__(self, text):
-                self.role = 'assistant'
-                self.content = [type('obj', (object,), {
-                    'type': 'text',
-                    'text': text
-                })]
-
         async def mock_query(*args, **kwargs):
-            yield MockMessage('[]')
+            message = AssistantMessage(content=[
+                TextBlock(text='[]')
+            ])
+            yield message
 
         with patch('founder_finder.query', side_effect=mock_query):
             founders = await find_founders("Unknown Company", "https://example.com")
@@ -114,16 +116,11 @@ class TestFindFounders:
     @pytest.mark.asyncio
     async def test_find_founders_with_markdown(self):
         """Test handling response wrapped in markdown code blocks"""
-        class MockMessage:
-            def __init__(self, text):
-                self.role = 'assistant'
-                self.content = [type('obj', (object,), {
-                    'type': 'text',
-                    'text': text
-                })]
-
         async def mock_query(*args, **kwargs):
-            yield MockMessage('```json\n["John Doe", "Jane Smith"]\n```')
+            message = AssistantMessage(content=[
+                TextBlock(text='```json\n["John Doe", "Jane Smith"]\n```')
+            ])
+            yield message
 
         with patch('founder_finder.query', side_effect=mock_query):
             founders = await find_founders("Test Co", "https://test.com")
@@ -132,16 +129,11 @@ class TestFindFounders:
     @pytest.mark.asyncio
     async def test_find_founders_invalid_json(self):
         """Test handling invalid JSON response"""
-        class MockMessage:
-            def __init__(self, text):
-                self.role = 'assistant'
-                self.content = [type('obj', (object,), {
-                    'type': 'text',
-                    'text': text
-                })]
-
         async def mock_query(*args, **kwargs):
-            yield MockMessage('This is not JSON')
+            message = AssistantMessage(content=[
+                TextBlock(text='This is not JSON')
+            ])
+            yield message
 
         with patch('founder_finder.query', side_effect=mock_query):
             founders = await find_founders("Test Co", "https://test.com")

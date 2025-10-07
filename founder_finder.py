@@ -8,8 +8,19 @@ import asyncio
 import json
 import os
 import re
+from pathlib import Path
 from typing import List, Dict
-from claude_agent_sdk import query, ClaudeAgentOptions
+from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, TextBlock
+
+# Load .env file if it exists
+env_path = Path(__file__).parent / '.env'
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ[key] = value
 
 
 def parse_companies_file(filepath: str) -> List[Dict[str, str]]:
@@ -98,10 +109,10 @@ No explanation needed, just the JSON array."""
         response_text = ""
         async for message in query(prompt=prompt, options=options):
             # Extract text content from assistant messages
-            if hasattr(message, 'role') and message.role == 'assistant':
+            if isinstance(message, AssistantMessage):
                 if hasattr(message, 'content') and isinstance(message.content, list):
                     for block in message.content:
-                        if hasattr(block, 'type') and block.type == 'text':
+                        if isinstance(block, TextBlock):
                             response_text += block.text
 
         # Clean up the response
