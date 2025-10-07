@@ -54,6 +54,31 @@ def parse_companies_file(filepath: str) -> List[Dict[str, str]]:
     return companies
 
 
+def setup_conversation_log(company_name: str) -> Path:
+    """Create a conversation log file for a company"""
+    # Create logs directory if it doesn't exist
+    logs_dir = Path("logs")
+    logs_dir.mkdir(exist_ok=True)
+
+    # Sanitize company name for filename
+    safe_name = company_name.replace(" ", "_").replace("/", "_")
+    log_file = logs_dir / f"{safe_name}_conversation.log"
+
+    # Clear existing log file
+    with open(log_file, 'w') as f:
+        f.write(f"=== Conversation Log for {company_name} ===\n")
+        f.write(f"Started at: {Path(__file__).parent}\n\n")
+
+    return log_file
+
+
+def log_to_file(log_file: Path, message: str):
+    """Write a message to the log file with auto-flush"""
+    with open(log_file, 'a') as f:
+        f.write(message + "\n")
+        f.flush()  # Force write to disk immediately
+
+
 async def find_founders(company_name: str, company_url: str) -> List[str]:
     """
     Use Claude Agent SDK to find founders for a given company.
@@ -110,6 +135,11 @@ Example (difficult case):
 
 Research using web search. Output your answer in XML format: <final>[...]</final>"""
 
+    # Set up conversation logging
+    log_file = setup_conversation_log(company_name)
+    log_to_file(log_file, f"PROMPT:\n{prompt}\n")
+    log_to_file(log_file, "=" * 60)
+
     try:
         # Track all responses and extract intermediate/final answers
         all_text = ""
@@ -124,6 +154,7 @@ Research using web search. Output your answer in XML format: <final>[...]</final
             # Track turns
             if isinstance(message, AssistantMessage):
                 turn_count += 1
+                log_to_file(log_file, f"\n--- Turn {turn_count} (AssistantMessage) ---")
 
             # Log tool usage and extract text
             if isinstance(message, AssistantMessage):
@@ -136,14 +167,22 @@ Research using web search. Output your answer in XML format: <final>[...]</final
                             if tool_name == 'WebSearch':
                                 query_text = tool_input.get('query', '')
                                 print(f"    🔍 Searching: \"{query_text}\"")
+                                log_to_file(log_file, f"TOOL USE: WebSearch")
+                                log_to_file(log_file, f"  Query: {query_text}")
                             elif tool_name == 'WebFetch':
                                 url = tool_input.get('url', '')
                                 print(f"    🌐 Fetching: {url}")
+                                log_to_file(log_file, f"TOOL USE: WebFetch")
+                                log_to_file(log_file, f"  URL: {url}")
 
                         # Collect text responses
                         if isinstance(block, TextBlock):
                             text = block.text
                             all_text += text + "\n"
+
+                            # Log agent text output
+                            log_to_file(log_file, f"AGENT OUTPUT:")
+                            log_to_file(log_file, text)
 
                             # Extract <progress> tags
                             progress_matches = re.findall(r'<progress>\s*(\[.*?\])\s*</progress>', text, re.DOTALL)
@@ -151,6 +190,7 @@ Research using web search. Output your answer in XML format: <final>[...]</final
                                 try:
                                     latest_progress = json.loads(match)
                                     print(f"    📝 Progress: Found {len(latest_progress)} founder(s) so far")
+                                    log_to_file(log_file, f"EXTRACTED PROGRESS: {latest_progress}")
                                 except json.JSONDecodeError:
                                     pass
 
@@ -160,12 +200,23 @@ Research using web search. Output your answer in XML format: <final>[...]</final
                                 try:
                                     final_answer = json.loads(match)
                                     print(f"    ✅ Final answer: {len(final_answer)} founder(s)")
+                                    log_to_file(log_file, f"EXTRACTED FINAL: {final_answer}")
                                 except json.JSONDecodeError:
                                     pass
 
             # Log when tool results come back
             elif msg_type == 'UserMessage':
                 print(f"    ✓ Tool results received")
+                log_to_file(log_file, "TOOL RESULTS RECEIVED")
+
+                # Log tool result content (truncated if too long)
+                if hasattr(message, 'content') and isinstance(message.content, list):
+                    for block in message.content:
+                        if hasattr(block, 'content'):
+                            content = str(block.content)
+                            if len(content) > 500:
+                                content = content[:500] + "... (truncated)"
+                            log_to_file(log_file, f"  {content}")
 
         # Determine final result
         if final_answer is not None:

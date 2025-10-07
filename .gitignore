@@ -37,6 +37,10 @@ wheels/
 # Output
 founders.json
 
+# Logs
+logs/
+*.log
+
 # Testing
 .pytest_cache/
 .coverage
