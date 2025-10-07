@@ -108,12 +108,32 @@ No explanation needed, just the JSON array."""
         # Collect all responses from the agent
         response_text = ""
         async for message in query(prompt=prompt, options=options):
-            # Extract text content from assistant messages
+            # Log intermediate steps for debugging
+            msg_type = type(message).__name__
+
+            # Log tool usage
             if isinstance(message, AssistantMessage):
                 if hasattr(message, 'content') and isinstance(message.content, list):
                     for block in message.content:
+                        # Log when agent uses a tool
+                        if hasattr(block, 'name') and hasattr(block, 'input'):
+                            tool_name = block.name
+                            tool_input = block.input
+                            if tool_name == 'WebSearch':
+                                query_text = tool_input.get('query', '')
+                                print(f"    🔍 Searching: \"{query_text}\"")
+                            elif tool_name == 'WebFetch':
+                                url = tool_input.get('url', '')
+                                print(f"    🌐 Fetching: {url}")
+
+                        # Collect text responses
                         if isinstance(block, TextBlock):
                             response_text += block.text
+                            print(f"    💬 Agent responded with text ({len(block.text)} chars)")
+
+            # Log when tool results come back
+            elif msg_type == 'UserMessage':
+                print(f"    ✓ Tool results received")
 
         # Clean up the response
         response_text = response_text.strip()
@@ -144,6 +164,28 @@ No explanation needed, just the JSON array."""
         return []
 
 
+async def find_founders_with_logging(company: Dict[str, str], index: int, total: int) -> tuple[str, List[str]]:
+    """
+    Wrapper around find_founders that adds logging for parallel execution.
+
+    Args:
+        company: Dict with 'name' and 'url' keys
+        index: Company index (1-based)
+        total: Total number of companies
+
+    Returns:
+        Tuple of (company_name, founders_list)
+    """
+    name = company['name']
+    url = company['url']
+
+    print(f"[{index}/{total}] Starting search for {name}...")
+    founders = await find_founders(name, url)
+    print(f"[{index}/{total}] ✓ {name}: Found {len(founders)} founders")
+
+    return (name, founders)
+
+
 async def main():
     """Main entry point for the founder finder tool."""
 
@@ -160,30 +202,37 @@ async def main():
         return
 
     companies = parse_companies_file(companies_file)
-    print(f"Found {len(companies)} companies to process\n")
+    total = len(companies)
 
-    # Find founders for each company
-    results = {}
+    print(f"Found {total} companies to process")
+    print(f"Running in parallel mode - all companies processed concurrently\n")
 
-    for i, company in enumerate(companies, 1):
-        name = company['name']
-        url = company['url']
+    # Create tasks for all companies to run in parallel
+    # Each agent gets only one company and runs independently
+    tasks = [
+        find_founders_with_logging(company, i + 1, total)
+        for i, company in enumerate(companies)
+    ]
 
-        print(f"[{i}/{len(companies)}] Finding founders for {name}...")
-        founders = await find_founders(name, url)
-        results[name] = founders
-        print(f"  → Found: {founders}\n")
+    # Execute all tasks concurrently
+    print("Starting parallel execution...\n")
+    results_list = await asyncio.gather(*tasks)
+
+    # Convert list of tuples to dict
+    results = dict(results_list)
 
     # Write results to JSON file
     output_file = 'founders.json'
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2)
 
+    print(f"\n{'=' * 60}")
     print(f"✓ Results saved to {output_file}")
     print(f"\nSummary:")
     print(f"  Total companies: {len(results)}")
     print(f"  Companies with founders: {sum(1 for f in results.values() if f)}")
     print(f"  Companies without founders: {sum(1 for f in results.values() if not f)}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == '__main__':
