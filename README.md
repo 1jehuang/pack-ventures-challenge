@@ -86,15 +86,7 @@ Quick test with a single company (Airbnb) to verify the agent is working.
 
 ### Technology Stack
 
-**Claude Agent SDK:** I chose the Claude Agent SDK over building a custom scraper or using traditional APIs for several key reasons:
-
-1. **Robustness:** Web scraping is fragile and breaks when websites change structure. The SDK uses AI to understand context, making it resilient to different website layouts.
-
-2. **Web Search Integration:** The SDK provides built-in web search capabilities, allowing the agent to query multiple sources (news articles, Crunchbase, LinkedIn, company websites) automatically.
-
-3. **Intelligent Parsing:** Instead of writing complex regex patterns or HTML parsers, the AI agent understands founder information contextually and can distinguish between founders, advisors, and employees.
-
-4. **Production-Ready:** The SDK includes error handling, context management, and tool orchestration out-of-the-box.
+**Claude Agent SDK:** Uses the Claude Agent SDK for simplicity. The SDK provides built-in web search, intelligent parsing, and tool orchestration without needing custom scrapers or complex HTML parsing logic.
 
 ### Implementation Strategy
 
@@ -224,13 +216,13 @@ Each founder query uses approximately:
 
 **Actual run results (10 companies in parallel):**
 - Total cost: ~$0.08 USD
-- Processing time: ~30-60 seconds (all companies processed concurrently)
+- Processing time: ~5 minutes (all companies processed concurrently)
 - Cache hits improve cost on subsequent runs
 
-**Performance gains from parallelization:**
-- Sequential: ~5-10 minutes (one company at a time)
-- Parallel: ~30-60 seconds (all companies at once)
-- **Speed improvement: ~10x faster**
+**Performance characteristics:**
+- Runtime is ~5 minutes regardless of input size n (due to full parallelization)
+- All agents run concurrently, so total time = time for slowest individual query
+- Sequential processing would take ~5 minutes × n companies
 
 ## License
 
