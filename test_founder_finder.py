@@ -77,10 +77,10 @@ class TestFindFounders:
 
     @pytest.mark.asyncio
     async def test_find_founders_valid_response(self):
-        """Test finding founders with valid JSON response"""
+        """Test finding founders with XML final tag"""
         async def mock_query(*args, **kwargs):
             # Create mock objects that match the real SDK structure
-            text_block = type('TextBlock', (), {'text': '["Brian Chesky", "Joe Gebbia", "Nathan Blecharczyk"]'})()
+            text_block = type('TextBlock', (), {'text': '<final>["Brian Chesky", "Joe Gebbia", "Nathan Blecharczyk"]</final>'})()
             message = type('AssistantMessage', (), {'content': [text_block]})()
             yield message
 

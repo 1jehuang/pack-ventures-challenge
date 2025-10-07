@@ -72,9 +72,9 @@ async def find_founders(company_name: str, company_url: str) -> List[str]:
     """
     # Configure agent options with web search capabilities
     # allowed_tools: Enable WebSearch and WebFetch for finding founder info online
-    # system_prompt: Instructs the agent to return only founder names in JSON format
+    # system_prompt: Allows agent to think and show intermediate progress
     # model: Use Claude Sonnet 4.5 for high-quality responses
-    # max_turns: Limit to 5 turns to keep queries efficient
+    # max_turns: Allow up to 10 turns for thorough research
     options = ClaudeAgentOptions(
         allowed_tools=["WebSearch", "WebFetch"],
         system_prompt="""You are a research assistant specialized in finding company founders.
@@ -82,36 +82,50 @@ async def find_founders(company_name: str, company_url: str) -> List[str]:
 Your task: Find the names of the original founders/co-founders of companies.
 
 Rules:
-- Return ONLY the names of actual founders/co-founders (people who started the company)
+- Find ONLY actual founders/co-founders (people who started the company)
 - Do NOT include advisors, investors, board members, or employees
 - Focus on current/original founders, not interim CEOs or replacements
-- If you cannot find reliable founder information, return an empty response
 
-Output format: Return ONLY a JSON array of founder names, nothing else.
-Example: ["John Doe", "Jane Smith"]
-If no founders found: []
+Most companies should be easy to find - search once and return your final answer immediately.
+If you're struggling to find clear information, you can search multiple times and show progress as you go.
 
-Be concise and factual. Use web search to verify information.""",
+Output format - use XML tags:
+- When you find all founders: <final>["Founder1", "Founder2", ...]</final>
+- If searching multiple times, show progress: <progress>["Founder1", ...]</progress> then <final>[...]</final>
+- If no founders found: <final>[]</final>
+
+Example (easy case):
+<final>["John Doe", "Jane Smith"]</final>
+
+Example (difficult case):
+<progress>["John Doe"]</progress>
+<progress>["John Doe", "Jane Smith"]</progress>
+<final>["John Doe", "Jane Smith", "Bob Johnson"]</final>""",
         model="claude-sonnet-4-5-20250929",
-        max_turns=5
+        max_turns=10
     )
 
     # Create the prompt for the agent
     prompt = f"""Find the founders of {company_name} ({company_url}).
 
-Return ONLY a JSON array of founder names. Example: ["Name1", "Name2"]
-If no founders found, return: []
-
-No explanation needed, just the JSON array."""
+Research using web search. Output your answer in XML format: <final>[...]</final>"""
 
     try:
-        # Collect all responses from the agent
-        response_text = ""
+        # Track all responses and extract intermediate/final answers
+        all_text = ""
+        latest_progress = None
+        final_answer = None
+        turn_count = 0
+
         async for message in query(prompt=prompt, options=options):
             # Log intermediate steps for debugging
             msg_type = type(message).__name__
 
-            # Log tool usage
+            # Track turns
+            if isinstance(message, AssistantMessage):
+                turn_count += 1
+
+            # Log tool usage and extract text
             if isinstance(message, AssistantMessage):
                 if hasattr(message, 'content') and isinstance(message.content, list):
                     for block in message.content:
@@ -128,39 +142,65 @@ No explanation needed, just the JSON array."""
 
                         # Collect text responses
                         if isinstance(block, TextBlock):
-                            response_text += block.text
-                            print(f"    💬 Agent responded with text ({len(block.text)} chars)")
+                            text = block.text
+                            all_text += text + "\n"
+
+                            # Extract <progress> tags
+                            progress_matches = re.findall(r'<progress>\s*(\[.*?\])\s*</progress>', text, re.DOTALL)
+                            for match in progress_matches:
+                                try:
+                                    latest_progress = json.loads(match)
+                                    print(f"    📝 Progress: Found {len(latest_progress)} founder(s) so far")
+                                except json.JSONDecodeError:
+                                    pass
+
+                            # Extract <final> tag
+                            final_matches = re.findall(r'<final>\s*(\[.*?\])\s*</final>', text, re.DOTALL)
+                            for match in final_matches:
+                                try:
+                                    final_answer = json.loads(match)
+                                    print(f"    ✅ Final answer: {len(final_answer)} founder(s)")
+                                except json.JSONDecodeError:
+                                    pass
 
             # Log when tool results come back
             elif msg_type == 'UserMessage':
                 print(f"    ✓ Tool results received")
 
-        # Clean up the response
-        response_text = response_text.strip()
-
-        # Remove markdown code blocks if present
-        response_text = re.sub(r'```json\s*|\s*```', '', response_text)
-        response_text = response_text.strip()
-
-        # Parse JSON
-        founders = json.loads(response_text)
-
-        # Validate it's a list
-        if not isinstance(founders, list):
-            print(f"Warning: Response for {company_name} is not a list: {response_text}")
-            return []
+        # Determine final result
+        if final_answer is not None:
+            # Agent provided <final> answer
+            founders = final_answer
+        elif latest_progress is not None:
+            # Agent hit max_turns but had <progress> answer
+            print(f"    ⚠️  Max turns reached - using latest <progress>")
+            founders = latest_progress
+        else:
+            # Try to extract any JSON array from the response
+            print(f"    ⚠️  No <progress> or <final> tags found - attempting fallback extraction")
+            json_arrays = re.findall(r'\[(?:[^\[\]]|"[^"]*")*\]', all_text)
+            if json_arrays:
+                try:
+                    # Try the last JSON array found
+                    founders = json.loads(json_arrays[-1])
+                    if isinstance(founders, list):
+                        print(f"    ℹ️  Extracted from text: {len(founders)} founder(s)")
+                    else:
+                        founders = []
+                except json.JSONDecodeError:
+                    print(f"    ❌ Could not parse any founder data")
+                    founders = []
+            else:
+                print(f"    ❌ No founder data found in response")
+                founders = []
 
         # Validate all items are strings
-        founders = [str(f) for f in founders if f]
+        founders = [str(f) for f in founders if f and isinstance(f, str)]
 
         return founders
 
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON for {company_name}: {e}")
-        print(f"Response was: {response_text}")
-        return []
     except Exception as e:
-        print(f"Error finding founders for {company_name}: {e}")
+        print(f"    ❌ Error finding founders for {company_name}: {e}")
         return []
 
 
